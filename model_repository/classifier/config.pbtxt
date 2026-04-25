@@ -1,0 +1,24 @@
+name: "classifier"
+backend: "onnxruntime"
+platform: "onnxruntime_onnx"
+max_batch_size: 8
+
+input [
+  {
+    name: "features"
+    data_type: TYPE_FP32
+    dims: [ 1, 64, -1 ]
+  }
+]
+
+output [
+  {
+    name: "logits"
+    data_type: TYPE_FP32
+    dims: [ 17 ]
+  }
+]
+
+instance_group [
+  { count: 1, kind: KIND_CPU }
+]

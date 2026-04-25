@@ -1,1 +1,9 @@
 commitizen
+numpy==1.26.*
+scipy==1.13.*
+librosa==0.10.*
+soundfile==0.12.*
+pytest==8.*
+onnx==1.16.*
+torch==2.3.*
+tritonclient[grpc]==2.48.*

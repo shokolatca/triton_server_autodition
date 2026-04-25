@@ -1,0 +1,33 @@
+name: "channel_selector"
+backend: "python"
+max_batch_size: 0
+
+input [
+  {
+    name: "audio"
+    data_type: TYPE_FP32
+    dims: [ 8, -1 ]
+  },
+  {
+    name: "doa_deg"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "mono_audio"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  },
+  {
+    name: "selected_mic"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  { count: 1, kind: KIND_CPU }
+]

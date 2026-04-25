@@ -1,0 +1,43 @@
+name: "localizer"
+backend: "python"
+max_batch_size: 0
+
+input [
+  {
+    name: "audio"
+    data_type: TYPE_FP32
+    dims: [ 8, -1 ]
+  },
+  {
+    name: "sample_rate"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "doa_deg"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "coarse_doa_deg"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "peak_amplitude"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  { count: 1, kind: KIND_CPU }
+]
+
+parameters [
+  { key: "ARRAY_RADIUS_M", value: { string_value: "0.5" } },
+  { key: "SPEED_OF_SOUND", value: { string_value: "343.0" } }
+]

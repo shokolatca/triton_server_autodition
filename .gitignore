@@ -1,1 +1,11 @@
 .venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Generated / model artifacts too large for git
+model_repository/classifier/1/*.onnx
+demo/assets/*.wav
+!demo/assets/.gitkeep

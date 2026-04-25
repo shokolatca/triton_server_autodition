@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libsndfile1 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+      gradio==4.44.0 \
+      tritonclient[grpc]==2.48.0 \
+      soundfile==0.12.1 \
+      numpy==1.26.4 \
+      matplotlib==3.9.2
+
+COPY demo/ /app/demo/
+
+EXPOSE 7860
+
+CMD ["python", "-m", "demo.app"]

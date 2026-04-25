@@ -1,0 +1,68 @@
+name: "pipeline"
+backend: "python"
+max_batch_size: 0
+
+input [
+  {
+    name: "audio"
+    data_type: TYPE_FP32
+    dims: [ 8, -1 ]
+  },
+  {
+    name: "sample_rate"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "class_id"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "class_name"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "confidence"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "probs"
+    data_type: TYPE_FP32
+    dims: [ 17 ]
+  },
+  {
+    name: "doa_deg"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "selected_mic"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "distance_m"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "is_emv"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  { count: 1, kind: KIND_CPU }
+]
+
+parameters [
+  { key: "A0", value: { string_value: "1.0" } },
+  { key: "R0", value: { string_value: "10.0" } }
+]

@@ -1,0 +1,28 @@
+{
+  "classes": [
+    "Car acceleration",
+    "Car braking",
+    "Car horn",
+    "Car idling",
+    "Motorcycle acceleration",
+    "Motorcycle idling",
+    "Tram acceleration",
+    "Tram bell",
+    "Tram braking",
+    "Tram passing",
+    "Truck acceleration",
+    "Truck braking",
+    "Truck horn",
+    "Truck idling",
+    "Siren Ambulance",
+    "Siren Police",
+    "Siren Firefighters"
+  ],
+  "emv": [
+    "Siren Ambulance",
+    "Siren Police",
+    "Siren Firefighters"
+  ],
+  "input_name": "features",
+  "output_name": "logits"
+}

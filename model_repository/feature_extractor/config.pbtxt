@@ -1,0 +1,36 @@
+name: "feature_extractor"
+backend: "python"
+max_batch_size: 0
+
+input [
+  {
+    name: "mono_audio"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  },
+  {
+    name: "sample_rate"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "features"
+    data_type: TYPE_FP32
+    dims: [ 1, 1, 64, -1 ]
+  }
+]
+
+instance_group [
+  { count: 1, kind: KIND_CPU }
+]
+
+parameters [
+  { key: "N_MELS", value: { string_value: "64" } },
+  { key: "N_FFT", value: { string_value: "1024" } },
+  { key: "HOP_LENGTH", value: { string_value: "512" } },
+  { key: "TARGET_SR", value: { string_value: "22050" } },
+  { key: "TARGET_SEC", value: { string_value: "3.0" } }
+]
