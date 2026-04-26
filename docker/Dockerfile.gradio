@@ -8,6 +8,10 @@ RUN apt-get update && \
 
 RUN pip install --no-cache-dir \
       gradio==4.44.0 \
+      fastapi==0.112.2 \
+      starlette==0.38.6 \
+      pydantic==2.9.2 \
+      huggingface_hub==0.25.2 \
       tritonclient[grpc]==2.48.0 \
       soundfile==0.12.1 \
       numpy==1.26.4 \
