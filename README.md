@@ -1,103 +1,112 @@
-# САВОС — Triton inference server
+# САВОС — сервер инференса Triton
 
-Inference repository for the **САВОС** project (acoustic perception for autonomous vehicles, [TZ.md](TZ.md)). An 8-channel WAV from a circular microphone array is fed into a Triton-served pipeline that:
+Репозиторий инференса для проекта **САВОС**: акустическое восприятие для автономных транспортных средств по ТЗ. Восьмиканальный WAV с круговой микрофонной решетки подается в конвейер, развернутый через Triton, который:
 
-1. **Localizes** the source (coarse GCC-PHAT on the «two-square» pairs from TZ §4.1.2 → SRP-PHAT refinement in a ±5° sector)
-2. **Selects** the microphone closest to the estimated DOA
-3. **Extracts** a log-Mel spectrogram (librosa)
-4. **Classifies** the event into 17 traffic-sound classes via an ONNX CNN
-5. For emergency-vehicle sirens, **estimates** the distance from the peak amplitude (TZ §4.1.3)
+1. **Локализует** источник звука: грубая GCC-PHAT-оценка по парам «два квадрата» из ТЗ, затем SRP-PHAT-уточнение в секторе +/-5°
+2. **Выбирает** микрофон, ближайший к оцененному направлению прихода сигнала
+3. **Извлекает** log-Mel-спектрограмму через librosa
+4. **Классифицирует** событие выбранным в GUI CNN- или AST-классификатором
+5. Для сирен спецтранспорта **оценивает** расстояние по пиковой амплитуде по ТЗ
 
-Everything runs in two containers brought up by `docker compose up`. A Gradio UI on port 7860 is the demo face for the commission.
+Все запускается в двух контейнерах через `docker compose up`. Gradio UI на порту 7860 используется как демонстрационный интерфейс для комиссии.
 
-## Classes (17)
+## Классы (17)
 
-Car acceleration · Car braking · Car horn · Car idling · Motorcycle acceleration · Motorcycle idling · Tram acceleration · Tram bell · Tram braking · Tram passing · Truck acceleration · Truck braking · Truck horn · Truck idling · Siren Ambulance · Siren Police · Siren Firefighters
+car_acceleration · car_braking · car_horn · car_idling · moto_acceleration · moto_idling · siren_1 · siren_4 · siren_5 · tram · tram_acceleration · tram_braking · tram_ring · truck_acceleration · truck_braking · truck_horn · truck_idling
 
-## Quick start
+## Быстрый старт
 
 ```bash
-# 1. Put the trained classifier ONNX into the model repo
-cp /path/to/your/model.onnx model_repository/classifier/1/model.onnx
-# (or, until you have a real one, generate a tiny dummy model:)
-python scripts/export_dummy_classifier.py
+# 1. Репозиторий настроен на поставляемые ONNX-классификаторы:
+cp classification-models/fruletov_cnn_baseline_tuned.onnx model_repository/classifier/1/model.onnx
+cp classification-models/fruletov_ast_finetune_tuned.onnx model_repository/classifier_furletov_ast/1/model.onnx
+cp classification-models/us8k_cnn_baseline_tuned.onnx model_repository/classifier_us8k_cnn/1/model.onnx
+cp classification-models/us8k_ast_finetune_tuned.onnx model_repository/classifier_us8k_ast/1/model.onnx
 
-# 2. Verify labels.json — its `classes` list must match the logits order of model.onnx,
-#    and `input_name` / `output_name` must match the ONNX I/O names.
+# 2. Проверьте labels.json: список `classes` должен совпадать с порядком логитов model.onnx,
+#    а `input_name` / `output_name` должны совпадать с ONNX-именами входов и выходов.
 $EDITOR model_repository/classifier/labels.json
 
-# 3. (Optional) Synthesize a demo 8-channel WAV
+# 3. (Опционально) Сгенерируйте демонстрационный 8-канальный WAV
 python scripts/generate_demo_asset.py --doa 75 --out demo/assets/example_8ch.wav
 
-# 4. Bring everything up
+# 4. Запустите все сервисы
 docker compose up --build
 ```
 
-Then open http://localhost:7860 and drop in an 8-channel WAV.
+Затем откройте http://localhost:7860 и загрузите 8-канальный WAV.
 
-## Endpoints
+## Адреса сервисов
 
-| Service        | URL                                   |
+| Сервис         | URL                                   |
 |----------------|---------------------------------------|
 | Gradio UI      | http://localhost:7860                 |
 | Triton HTTP    | http://localhost:8000/v2              |
 | Triton gRPC    | `localhost:8001`                      |
 | Triton metrics | http://localhost:8002/metrics         |
 
-## CLI smoke test
+## Проверка через CLI
 
 ```bash
 docker compose exec gradio python -m demo.client --wav demo/assets/example_8ch.wav
 ```
 
-Outputs JSON with `class_name`, `confidence`, `doa_deg`, `selected_mic`, `distance_m`, `is_emv`.
+Команда выводит JSON с полями `classifier_model`, `class_name`, `confidence`, `doa_deg`, `selected_mic`, `distance_m`, `is_emv`.
 
-## Repository layout
+## Структура репозитория
 
 ```
 model_repository/
-├── pipeline/            # BLS orchestrator (the one model the client calls)
+├── pipeline/            # BLS-оркестратор: единственная модель, к которой обращается клиент
 ├── localizer/           # Python: GCC-PHAT + SRP-PHAT
-├── channel_selector/    # Python: nearest mic by DOA
-├── feature_extractor/   # Python: log-Mel via librosa
-└── classifier/          # ONNX Runtime backend
-    ├── 1/model.onnx     # ← user-supplied checkpoint
-    └── labels.json      # classes, EmV subset, ONNX I/O names
+├── channel_selector/    # Python: ближайший микрофон по DOA
+├── feature_extractor/   # Python: log-Mel через librosa
+├── ast_feature_extractor/ # Python: input_values для AST через transformers/torchaudio
+├── classifier/          # Furletov CNN по умолчанию на ONNX Runtime backend
+│   ├── 1/model.onnx     # ← чекпойнт, который добавляет пользователь
+│   ├── labels.json      # классы по умолчанию, EmV-подмножество, ONNX I/O-имена
+│   └── models.json      # каталог классификаторов для GUI/конвейера
+├── classifier_furletov_ast/
+├── classifier_us8k_ast/
+└── classifier_us8k_cnn/ # Опциональный CNN-классификатор UrbanSound8K
 demo/
 ├── app.py               # Gradio UI
-├── client.py            # CLI client
-└── assets/              # demo WAV(s)
+├── client.py            # CLI-клиент
+└── assets/              # демонстрационные WAV-файлы
 docker/                  # Dockerfile.triton, Dockerfile.gradio
 docker-compose.yml
-scripts/                 # one-off helpers (dummy ONNX, synth WAV)
-tests/                   # pytest unit tests
+scripts/                 # разовые вспомогательные скрипты: dummy ONNX, синтез WAV
+tests/                   # unit-тесты pytest
 ```
 
-## Microphone indexing convention
+## Соглашение об индексации микрофонов
 
-Channel `i` (0..7) in the WAV corresponds to the microphone at azimuth `i·45°` counter-clockwise from the vehicle forward axis (+X, 0°). Mic 0 is forward, mic 2 is left, mic 4 is rear, mic 6 is right.
+Канал `i` (0..7) в WAV соответствует микрофону с азимутом `i·45°` против часовой стрелки от продольной оси автомобиля вперед (+X, 0°). Микрофон 0 направлен вперед, микрофон 2 — влево, микрофон 4 — назад, микрофон 6 — вправо.
 
-## Conventions and assumptions
+## Соглашения и допущения
 
-- ONNX classifier input: `FP32[B, 1, 64, T]` (batch, channel, n_mels, time). Time axis is dynamic.
-- ONNX classifier output: `FP32[B, 17]` logits.
-- Mel parameters (configurable in `model_repository/feature_extractor/config.pbtxt`): `target_sr=22050, target_sec=3.0, n_mels=64, n_fft=1024, hop_length=512`. Adjust to match the training-time settings of your checkpoint.
-- ONNX I/O tensor names (configurable in `labels.json`): `features`, `logits`. If your export used different names (often `input` / `output`), edit `labels.json` and `model_repository/classifier/config.pbtxt` accordingly — no re-export needed.
-- Distance calibration constants `A0`, `R0` are in `model_repository/pipeline/config.pbtxt` `parameters` and require empirical calibration.
+- Интегрированы классификаторы с выбором в GUI: `furletov_cnn`, `furletov_ast`, `us8k_cnn` и `us8k_ast`.
+- Вход CNN-классификатора: `mel_spectrogram`, `FP32[B, T, 128]` (batch, time, n_mels). Временная ось динамическая.
+- Вход AST-классификатора: `input_values`, `FP32[B, 1024, 128]`.
+- Выход ONNX-классификатора: логиты `FP32[B, C]`, где `C` зависит от выбранного классификатора.
+- Mel-параметры задаются в `model_repository/feature_extractor/config.pbtxt`: `target_sr=16000, target_sec=10.0, n_mels=128, n_fft=1024, hop_length=512`.
+- AST-параметры задаются в `model_repository/ast_feature_extractor/config.pbtxt`: `target_sr=16000, max_length=1024, num_mel_bins=128, mean=-4.2677393, std=4.5689974`.
+- Имена ONNX I/O-тензоров и списки классов для выбора в GUI находятся в `model_repository/classifier/models.json`.
+- Константы калибровки расстояния `A0`, `R0` находятся в `parameters` файла `model_repository/pipeline/config.pbtxt` и требуют эмпирической калибровки.
 
-## Development
+## Разработка
 
 ```bash
 pip install -r requirements.txt
-pytest tests/                                         # unit tests, no Triton needed
-python scripts/export_dummy_classifier.py             # build a tiny random ONNX
-python scripts/generate_demo_asset.py --doa 75        # build a synthetic 8-ch WAV
-docker compose up --build                             # full stack
+pytest tests/                                         # unit-тесты, Triton не нужен
+python scripts/export_dummy_classifier.py             # опциональная замена классификатора на совместимый небольшой random ONNX
+python scripts/generate_demo_asset.py --doa 75        # сборка синтетического 8-канального WAV
+docker compose up --build                             # полный стек
 ```
 
-## Troubleshooting
+## Диагностика проблем
 
-- **Classifier fails to load**: most often a tensor-name mismatch. Inspect with `python -c "import onnx, sys; m=onnx.load(sys.argv[1]); print([i.name for i in m.graph.input], [o.name for o in m.graph.output])" model_repository/classifier/1/model.onnx` and update `labels.json` + `classifier/config.pbtxt`.
-- **Shape mismatch in classifier**: the dummy-export shape is `[B, 1, 64, T]`. If your real model expects `[B, 64, T]` (no channel dim), drop the second `1` in `feature_extractor/config.pbtxt` output and `classifier/config.pbtxt` input, and remove the extra `[None, ...]` in `feature_extractor/1/model.py`.
-- **DOA looks wrong by ~180°**: check microphone numbering matches the +X-CCW convention above.
-- **Gradio cannot reach Triton**: `docker compose logs triton` for backend load errors; the Gradio container expects `TRITON_URL=triton:8001` (set by compose).
+- **Классификатор не загружается**: чаще всего причина в несовпадении имен тензоров. Проверьте их через `python -c "import onnx, sys; m=onnx.load(sys.argv[1]); print([i.name for i in m.graph.input], [o.name for o in m.graph.output])" model_repository/classifier/1/model.onnx` и обновите `labels.json` + `classifier/config.pbtxt`.
+- **Несовпадение формы тензора в классификаторе**: интегрированный Furletov CNN ожидает `[B, T, 128]`. Если вы подменяете его на CNN, который ожидает `[B, 1, n_mels, T]`, обновите `feature_extractor/1/model.py`, `feature_extractor/config.pbtxt` и `classifier/config.pbtxt` вместе.
+- **DOA ошибается примерно на 180°**: проверьте, что нумерация микрофонов соответствует соглашению +X-CCW выше.
+- **Gradio не может подключиться к Triton**: выполните `docker compose logs triton`, чтобы посмотреть ошибки загрузки бэкенда; контейнер Gradio ожидает `TRITON_URL=triton:8001` (задается compose).

@@ -12,6 +12,77 @@ import tritonclient.grpc as grpcclient
 
 MIC_COUNT = 8
 MODEL_NAME = "pipeline"
+DEFAULT_CLASSIFIER_MODEL = "furletov_cnn"
+CLASSIFIER_MODEL_CHOICES = {
+    "furletov_cnn": "Furletov CNN (17 traffic classes)",
+    "furletov_ast": "Furletov AST (17 traffic classes)",
+    "us8k_cnn": "UrbanSound8K CNN (10 classes)",
+    "us8k_ast": "UrbanSound8K AST (10 classes)",
+}
+CLASSIFIER_LABELS = {
+    "furletov_cnn": [
+        "car_acceleration",
+        "car_braking",
+        "car_horn",
+        "car_idling",
+        "moto_acceleration",
+        "moto_idling",
+        "siren_1",
+        "siren_4",
+        "siren_5",
+        "tram",
+        "tram_acceleration",
+        "tram_braking",
+        "tram_ring",
+        "truck_acceleration",
+        "truck_braking",
+        "truck_horn",
+        "truck_idling",
+    ],
+    "furletov_ast": [
+        "car_acceleration",
+        "car_braking",
+        "car_horn",
+        "car_idling",
+        "moto_acceleration",
+        "moto_idling",
+        "siren_1",
+        "siren_4",
+        "siren_5",
+        "tram",
+        "tram_acceleration",
+        "tram_braking",
+        "tram_ring",
+        "truck_acceleration",
+        "truck_braking",
+        "truck_horn",
+        "truck_idling",
+    ],
+    "us8k_cnn": [
+        "air_conditioner",
+        "car_horn",
+        "children_playing",
+        "dog_bark",
+        "drilling",
+        "engine_idling",
+        "gun_shot",
+        "jackhammer",
+        "siren",
+        "street_music",
+    ],
+    "us8k_ast": [
+        "air_conditioner",
+        "car_horn",
+        "children_playing",
+        "dog_bark",
+        "drilling",
+        "engine_idling",
+        "gun_shot",
+        "jackhammer",
+        "siren",
+        "street_music",
+    ],
+}
 
 
 @dataclass
@@ -33,7 +104,12 @@ def load_8ch_wav(path: str) -> tuple[np.ndarray, int]:
     return audio.T.astype(np.float32, copy=False), int(sr)
 
 
-def run_pipeline(audio_8ch: np.ndarray, sample_rate: int, url: str | None = None) -> PipelineResult:
+def run_pipeline(
+    audio_8ch: np.ndarray,
+    sample_rate: int,
+    url: str | None = None,
+    classifier_model: str = DEFAULT_CLASSIFIER_MODEL,
+) -> PipelineResult:
     url = url or os.environ.get("TRITON_URL", "localhost:8001")
     client = grpcclient.InferenceServerClient(url=url)
 
@@ -42,13 +118,15 @@ def run_pipeline(audio_8ch: np.ndarray, sample_rate: int, url: str | None = None
     sr_arr = np.array([sample_rate], dtype=np.int32)
     sr_in = grpcclient.InferInput("sample_rate", [1], "INT32")
     sr_in.set_data_from_numpy(sr_arr)
+    classifier_in = grpcclient.InferInput("classifier_model", [1], "BYTES")
+    classifier_in.set_data_from_numpy(np.array([classifier_model], dtype=object))
 
     requested = [
         "class_id", "class_name", "confidence", "probs",
         "doa_deg", "selected_mic", "distance_m", "is_emv",
     ]
     outputs = [grpcclient.InferRequestedOutput(name) for name in requested]
-    response = client.infer(MODEL_NAME, inputs=[audio_in, sr_in], outputs=outputs)
+    response = client.infer(MODEL_NAME, inputs=[audio_in, sr_in, classifier_in], outputs=outputs)
 
     name_arr = response.as_numpy("class_name")[0]
     if isinstance(name_arr, bytes):

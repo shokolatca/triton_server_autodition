@@ -29,6 +29,25 @@ def _find_labels(model_repository: str, model_name: str) -> Path:
     raise FileNotFoundError(f"labels.json not found near {model_repository} (model {model_name})")
 
 
+def _find_model_catalog(model_repository: str) -> Path | None:
+    repo = Path(model_repository)
+    candidates = [
+        repo / "classifier" / "models.json",
+        repo.parent / "classifier" / "models.json",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return None
+
+
+def _decode_string_tensor(value: np.ndarray) -> str:
+    item = value.reshape(-1)[0]
+    if isinstance(item, bytes):
+        return item.decode("utf-8")
+    return str(item)
+
+
 class TritonPythonModel:
     def initialize(self, args):
         config = json.loads(args["model_config"])
@@ -36,18 +55,38 @@ class TritonPythonModel:
         self.A0 = float(params.get("A0", "1.0"))
         self.R0 = float(params.get("R0", "10.0"))
 
-        labels_path = _find_labels(args["model_repository"], args["model_name"])
-        labels = json.loads(labels_path.read_text())
-        self.classes = labels["classes"]
-        self.emv = set(labels.get("emv", []))
-        self.clf_input = labels.get("input_name", "features")
-        self.clf_output = labels.get("output_name", "logits")
+        catalog_path = _find_model_catalog(args["model_repository"])
+        if catalog_path is None:
+            labels_path = _find_labels(args["model_repository"], args["model_name"])
+            labels = json.loads(labels_path.read_text())
+            self.default_classifier = "default"
+            self.classifiers = {
+                "default": {
+                    "triton_model": "classifier",
+                    "classes": labels["classes"],
+                    "emv": labels.get("emv", []),
+                    "input_name": labels.get("input_name", "features"),
+                    "output_name": labels.get("output_name", "logits"),
+                    "feature_source": "mel_spectrogram",
+                }
+            }
+        else:
+            catalog = json.loads(catalog_path.read_text())
+            self.default_classifier = catalog["default"]
+            self.classifiers = catalog["models"]
 
     def execute(self, requests):
         responses = []
         for req in requests:
             audio_t = pb_utils.get_input_tensor_by_name(req, "audio")
             sr_t = pb_utils.get_input_tensor_by_name(req, "sample_rate")
+            classifier_t = pb_utils.get_input_tensor_by_name(req, "classifier_model")
+            classifier_id = (
+                _decode_string_tensor(classifier_t.as_numpy())
+                if classifier_t is not None
+                else self.default_classifier
+            )
+            classifier = self.classifiers.get(classifier_id, self.classifiers[self.default_classifier])
 
             loc = self._infer("localizer", [audio_t, sr_t], ["doa_deg", "peak_amplitude"])
             doa = loc["doa_deg"]
@@ -57,17 +96,30 @@ class TritonPythonModel:
             sel = self._infer("channel_selector", [audio_t, doa_t], ["mono_audio", "selected_mic"])
 
             mono_t = pb_utils.Tensor("mono_audio", sel["mono_audio"].astype(np.float32))
-            feat = self._infer("feature_extractor", [mono_t, sr_t], ["features"])
-
-            feat_t = pb_utils.Tensor(self.clf_input, feat["features"].astype(np.float32))
-            clf = self._infer("classifier", [feat_t], [self.clf_output])
-            logits = np.asarray(clf[self.clf_output]).reshape(-1)
+            feature_source = classifier.get("feature_source")
+            if feature_source == "mel_spectrogram":
+                feat = self._infer("feature_extractor", [mono_t, sr_t], ["features"])
+                feat_name = "features"
+            elif feature_source == "ast_input_values":
+                feat = self._infer("ast_feature_extractor", [mono_t, sr_t], ["input_values"])
+                feat_name = "input_values"
+            else:
+                raise pb_utils.TritonModelException(
+                    f"Unsupported feature_source for classifier {classifier_id}: "
+                    f"{feature_source}"
+                )
+            clf_input = classifier.get("input_name", "mel_spectrogram")
+            clf_output = classifier.get("output_name", "class_logits")
+            feat_t = pb_utils.Tensor(clf_input, feat[feat_name].astype(np.float32))
+            clf = self._infer(classifier["triton_model"], [feat_t], [clf_output])
+            logits = np.asarray(clf[clf_output]).reshape(-1)
             probs = _softmax(logits).astype(np.float32)
             cls_id = int(np.argmax(probs))
-            cls_name = self.classes[cls_id]
+            classes = classifier["classes"]
+            cls_name = classes[cls_id]
             confidence = float(probs[cls_id])
 
-            is_emv = cls_name in self.emv
+            is_emv = cls_name in set(classifier.get("emv", []))
             distance = (self.R0 * self.A0 / amp) if (is_emv and amp > 1e-9) else -1.0
 
             responses.append(

@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.triton
     container_name: savos-triton
+    shm_size: "1gb"
     command: >
       tritonserver
       --model-repository=/models
@@ -11,7 +12,11 @@ services:
       --load-model=localizer
       --load-model=channel_selector
       --load-model=feature_extractor
+      --load-model=ast_feature_extractor
       --load-model=classifier
+      --load-model=classifier_furletov_ast
+      --load-model=classifier_us8k_cnn
+      --load-model=classifier_us8k_ast
       --load-model=pipeline
       --log-verbose=1
       --allow-metrics=true

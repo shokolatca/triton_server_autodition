@@ -12,6 +12,11 @@ input [
     name: "sample_rate"
     data_type: TYPE_INT32
     dims: [ 1 ]
+  },
+  {
+    name: "classifier_model"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
   }
 ]
 
@@ -34,7 +39,7 @@ output [
   {
     name: "probs"
     data_type: TYPE_FP32
-    dims: [ 17 ]
+    dims: [ -1 ]
   },
   {
     name: "doa_deg"

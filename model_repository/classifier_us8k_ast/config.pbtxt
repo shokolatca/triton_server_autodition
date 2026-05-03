@@ -1,13 +1,13 @@
-name: "classifier"
+name: "classifier_us8k_ast"
 backend: "onnxruntime"
 platform: "onnxruntime_onnx"
 max_batch_size: 8
 
 input [
   {
-    name: "mel_spectrogram"
+    name: "input_values"
     data_type: TYPE_FP32
-    dims: [ -1, 128 ]
+    dims: [ 1024, 128 ]
   }
 ]
 
@@ -15,7 +15,7 @@ output [
   {
     name: "class_logits"
     data_type: TYPE_FP32
-    dims: [ 17 ]
+    dims: [ 10 ]
   }
 ]
 

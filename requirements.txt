@@ -6,4 +6,6 @@ soundfile==0.12.*
 pytest==8.*
 onnx==1.16.*
 torch==2.3.*
+torchaudio==2.3.*
+transformers==4.44.*
 tritonclient[grpc]==2.48.*

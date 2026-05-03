@@ -1,4 +1,4 @@
-name: "feature_extractor"
+name: "ast_feature_extractor"
 backend: "python"
 max_batch_size: 0
 
@@ -17,9 +17,9 @@ input [
 
 output [
   {
-    name: "features"
+    name: "input_values"
     data_type: TYPE_FP32
-    dims: [ 1, -1, 128 ]
+    dims: [ 1, 1024, 128 ]
   }
 ]
 
@@ -28,9 +28,9 @@ instance_group [
 ]
 
 parameters [
-  { key: "N_MELS", value: { string_value: "128" } },
-  { key: "N_FFT", value: { string_value: "1024" } },
-  { key: "HOP_LENGTH", value: { string_value: "512" } },
   { key: "TARGET_SR", value: { string_value: "16000" } },
-  { key: "TARGET_SEC", value: { string_value: "10.0" } }
+  { key: "MAX_LENGTH", value: { string_value: "1024" } },
+  { key: "NUM_MEL_BINS", value: { string_value: "128" } },
+  { key: "MEAN", value: { string_value: "-4.2677393" } },
+  { key: "STD", value: { string_value: "4.5689974" } }
 ]

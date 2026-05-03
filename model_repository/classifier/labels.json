@@ -1,28 +1,28 @@
 {
   "classes": [
-    "Car acceleration",
-    "Car braking",
-    "Car horn",
-    "Car idling",
-    "Motorcycle acceleration",
-    "Motorcycle idling",
-    "Tram acceleration",
-    "Tram bell",
-    "Tram braking",
-    "Tram passing",
-    "Truck acceleration",
-    "Truck braking",
-    "Truck horn",
-    "Truck idling",
-    "Siren Ambulance",
-    "Siren Police",
-    "Siren Firefighters"
+    "car_acceleration",
+    "car_braking",
+    "car_horn",
+    "car_idling",
+    "moto_acceleration",
+    "moto_idling",
+    "siren_1",
+    "siren_4",
+    "siren_5",
+    "tram",
+    "tram_acceleration",
+    "tram_braking",
+    "tram_ring",
+    "truck_acceleration",
+    "truck_braking",
+    "truck_horn",
+    "truck_idling"
   ],
   "emv": [
-    "Siren Ambulance",
-    "Siren Police",
-    "Siren Firefighters"
+    "siren_1",
+    "siren_4",
+    "siren_5"
   ],
-  "input_name": "features",
-  "output_name": "logits"
+  "input_name": "mel_spectrogram",
+  "output_name": "class_logits"
 }

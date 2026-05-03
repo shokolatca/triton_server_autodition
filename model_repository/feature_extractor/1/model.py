@@ -33,18 +33,18 @@ def compute_log_mel(
         n_mels=n_mels,
     )
     log_mel = librosa.power_to_db(mel).astype(np.float32)
-    return log_mel[None, None, :, :]
+    return np.ascontiguousarray(log_mel.T[None, :, :])
 
 
 class TritonPythonModel:
     def initialize(self, args):
         config = json.loads(args["model_config"])
         params = {k: v["string_value"] for k, v in config.get("parameters", {}).items()}
-        self.n_mels = int(params.get("N_MELS", "64"))
+        self.n_mels = int(params.get("N_MELS", "128"))
         self.n_fft = int(params.get("N_FFT", "1024"))
         self.hop_length = int(params.get("HOP_LENGTH", "512"))
-        self.target_sr = int(params.get("TARGET_SR", "22050"))
-        self.target_sec = float(params.get("TARGET_SEC", "3.0"))
+        self.target_sr = int(params.get("TARGET_SR", "16000"))
+        self.target_sec = float(params.get("TARGET_SEC", "10.0"))
 
     def execute(self, requests):
         responses = []

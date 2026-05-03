@@ -7,5 +7,6 @@ __pycache__/
 
 # Generated / model artifacts too large for git
 model_repository/classifier/1/*.onnx
+model_repository/classifier_*/1/*.onnx
 demo/assets/*.wav
 !demo/assets/.gitkeep

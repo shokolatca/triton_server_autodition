@@ -51,10 +51,12 @@ def test_pipeline_end_to_end(triton_client, doa_true: float) -> None:
     audio_in.set_data_from_numpy(audio.astype(np.float32))
     sr_in = grpcclient.InferInput("sample_rate", [1], "INT32")
     sr_in.set_data_from_numpy(np.array([sr], dtype=np.int32))
+    classifier_in = grpcclient.InferInput("classifier_model", [1], "BYTES")
+    classifier_in.set_data_from_numpy(np.array(["furletov_cnn"], dtype=object))
 
     requested = ["class_id", "doa_deg", "selected_mic", "distance_m", "is_emv"]
     outputs = [grpcclient.InferRequestedOutput(name) for name in requested]
-    response = triton_client.infer("pipeline", inputs=[audio_in, sr_in], outputs=outputs)
+    response = triton_client.infer("pipeline", inputs=[audio_in, sr_in, classifier_in], outputs=outputs)
 
     doa = float(response.as_numpy("doa_deg")[0])
     selected_mic = int(response.as_numpy("selected_mic")[0])

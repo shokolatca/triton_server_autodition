@@ -11,7 +11,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .triton_client import MIC_COUNT, PipelineResult, load_8ch_wav, run_pipeline
+from .triton_client import (
+    CLASSIFIER_LABELS,
+    CLASSIFIER_MODEL_CHOICES,
+    DEFAULT_CLASSIFIER_MODEL,
+    MIC_COUNT,
+    PipelineResult,
+    load_8ch_wav,
+    run_pipeline,
+)
 
 
 def _polar_plot(doa_deg: float, selected_mic: int) -> plt.Figure:
@@ -63,21 +71,18 @@ def _format_label(result: PipelineResult, label_names: list[str]) -> dict[str, f
     return {label_names[i]: float(result.probs[i]) for i in top_idx}
 
 
-LABELS = [
-    "Car acceleration", "Car braking", "Car horn", "Car idling",
-    "Motorcycle acceleration", "Motorcycle idling",
-    "Tram acceleration", "Tram bell", "Tram braking", "Tram passing",
-    "Truck acceleration", "Truck braking", "Truck horn", "Truck idling",
-    "Siren Ambulance", "Siren Police", "Siren Firefighters",
-]
-
-
-def infer(wav_path: str | None):
+def infer(wav_path: str | None, classifier_model: str):
     if not wav_path:
         return {}, None, "upload an 8-channel WAV"
     audio, sr = load_8ch_wav(wav_path)
-    result = run_pipeline(audio, sr, url=os.environ.get("TRITON_URL"))
-    return _format_label(result, LABELS), _polar_plot(result.doa_deg, result.selected_mic), _format_distance(result)
+    result = run_pipeline(
+        audio,
+        sr,
+        url=os.environ.get("TRITON_URL"),
+        classifier_model=classifier_model or DEFAULT_CLASSIFIER_MODEL,
+    )
+    labels = CLASSIFIER_LABELS.get(classifier_model, CLASSIFIER_LABELS[DEFAULT_CLASSIFIER_MODEL])
+    return _format_label(result, labels), _polar_plot(result.doa_deg, result.selected_mic), _format_distance(result)
 
 
 def build_ui() -> gr.Blocks:
@@ -93,12 +98,17 @@ def build_ui() -> gr.Blocks:
         with gr.Row():
             with gr.Column(scale=1):
                 audio_in = gr.Audio(sources=["upload"], type="filepath", label="8-channel WAV")
+                classifier_in = gr.Dropdown(
+                    choices=[(label, model_id) for model_id, label in CLASSIFIER_MODEL_CHOICES.items()],
+                    value=DEFAULT_CLASSIFIER_MODEL,
+                    label="Classifier model",
+                )
                 run_btn = gr.Button("Run pipeline", variant="primary")
             with gr.Column(scale=2):
                 label_out = gr.JSON(label="Predicted class probabilities")
                 plot_out = gr.Plot(label="Microphone array — DOA")
                 dist_out = gr.Textbox(label="Distance to source", interactive=False)
-        run_btn.click(infer, inputs=[audio_in], outputs=[label_out, plot_out, dist_out])
+        run_btn.click(infer, inputs=[audio_in, classifier_in], outputs=[label_out, plot_out, dist_out])
     return demo
 
 
