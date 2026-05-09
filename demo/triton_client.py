@@ -14,10 +14,10 @@ MIC_COUNT = 8
 MODEL_NAME = "pipeline"
 DEFAULT_CLASSIFIER_MODEL = "furletov_cnn"
 CLASSIFIER_MODEL_CHOICES = {
-    "furletov_cnn": "Furletov CNN (17 traffic classes)",
-    "furletov_ast": "Furletov AST (17 traffic classes)",
-    "us8k_cnn": "UrbanSound8K CNN (10 classes)",
-    "us8k_ast": "UrbanSound8K AST (10 classes)",
+    "furletov_cnn": "model-base",
+    "furletov_ast": "model-medium",
+    "us8k_cnn": "model-high",
+    "us8k_ast": "model-ultra",
 }
 CLASSIFIER_LABELS = {
     "furletov_cnn": [

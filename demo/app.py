@@ -87,11 +87,11 @@ def infer(wav_path: str | None, classifier_model: str):
 
 def build_ui() -> gr.Blocks:
     description = (
-        "## САВОС — Acoustic perception for autonomous vehicles\n"
-        "Upload an 8-channel WAV recorded by the circular microphone array. "
-        "The pipeline localizes the source (DOA), picks the nearest microphone, "
-        "extracts a Mel-spectrogram, and classifies the sound across 17 traffic classes. "
-        "For emergency-vehicle sirens an amplitude-based distance is reported."
+        "## САВОС — акустическое восприятие для автономного транспорта\n"
+        "Загрузите восьмиканальный WAV-файл, записанный круговой микрофонной решеткой. "
+        "Конвейер определяет направление на источник звука, выбирает ближайший микрофон, "
+        "извлекает аудиопризнаки и классифицирует звуковое событие. "
+        "Для сирен экстренных служб дополнительно рассчитывается расстояние до источника."
     )
     with gr.Blocks(title="САВОС") as demo:
         gr.Markdown(description)
@@ -101,11 +101,11 @@ def build_ui() -> gr.Blocks:
                 classifier_in = gr.Dropdown(
                     choices=[(label, model_id) for model_id, label in CLASSIFIER_MODEL_CHOICES.items()],
                     value=DEFAULT_CLASSIFIER_MODEL,
-                    label="Classifier model",
+                    label="Model",
                 )
                 run_btn = gr.Button("Run pipeline", variant="primary")
             with gr.Column(scale=2):
-                label_out = gr.JSON(label="Predicted class probabilities")
+                label_out = gr.JSON(label="Prediction probabilities")
                 plot_out = gr.Plot(label="Microphone array — DOA")
                 dist_out = gr.Textbox(label="Distance to source", interactive=False)
         run_btn.click(infer, inputs=[audio_in, classifier_in], outputs=[label_out, plot_out, dist_out])

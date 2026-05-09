@@ -2,7 +2,7 @@
   "default": "furletov_cnn",
   "models": {
     "furletov_cnn": {
-      "display_name": "Furletov CNN (17 traffic classes)",
+      "display_name": "model-base",
       "triton_model": "classifier",
       "input_name": "mel_spectrogram",
       "output_name": "class_logits",
@@ -33,7 +33,7 @@
       ]
     },
     "furletov_ast": {
-      "display_name": "Furletov AST (17 traffic classes)",
+      "display_name": "model-medium",
       "triton_model": "classifier_furletov_ast",
       "input_name": "input_values",
       "output_name": "class_logits",
@@ -64,7 +64,7 @@
       ]
     },
     "us8k_cnn": {
-      "display_name": "UrbanSound8K CNN (10 classes)",
+      "display_name": "model-high",
       "triton_model": "classifier_us8k_cnn",
       "input_name": "mel_spectrogram",
       "output_name": "class_logits",
@@ -86,7 +86,7 @@
       ]
     },
     "us8k_ast": {
-      "display_name": "UrbanSound8K AST (10 classes)",
+      "display_name": "model-ultra",
       "triton_model": "classifier_us8k_ast",
       "input_name": "input_values",
       "output_name": "class_logits",
