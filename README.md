@@ -8,6 +8,76 @@
 4. **Классифицирует** событие выбранным в GUI CNN- или AST-классификатором
 5. Для сирен спецтранспорта **оценивает** расстояние по пиковой амплитуде по ТЗ
 
+## Архитектура системы
+
+Клиентский уровень — Gradio-UI, CLI-клиент и gRPC-клиент — обращается к единой точке входа Triton Inference Server. Внутри Triton развёрнут BLS-оркестратор `pipeline`, который вызывает компонентные модели в нужном порядке и собирает результат.
+
+```mermaid
+flowchart LR
+    subgraph CLIENT ["Клиентский уровень"]
+        UI["Gradio UI<br/>(порт 7860)"]
+        CLI["CLI-клиент"]
+        GRPC["gRPC-клиент"]
+    end
+    CLIENT -->|"8-канальный WAV<br/>16 кГц, FP32"| TRT["Triton Inference Server<br/>(HTTP :8000 / gRPC :8001)"]
+    TRT --> PIPE[["BLS-оркестратор<br/>pipeline"]]
+    PIPE --> LOC["localizer<br/>(GCC-PHAT + SRP-PHAT)"]
+    PIPE --> CS["channel_selector<br/>(выбор канала по DOA)"]
+    CS --> FE["feature_extractor<br/>(log-Mel через librosa)"]
+    CS --> AFE["ast_feature_extractor<br/>(токены AST)"]
+    FE --> C_CNN["classifier_*<br/>CNN-классификаторы<br/>(ONNX Runtime)"]
+    AFE --> C_AST["classifier_*_ast<br/>AST-классификаторы<br/>(ONNX Runtime)"]
+    LOC --> OUT[("Ответ pipeline:<br/>doa_deg, selected_mic,<br/>class_name, confidence,<br/>distance_m, is_emv")]
+    C_CNN --> OUT
+    C_AST --> OUT
+```
+
+Каждый блок в `model_repository/` — это отдельная модель Triton с собственным `config.pbtxt`. Связи между блоками описаны в BLS-скрипте `model_repository/pipeline/1/model.py`.
+
+## Сквозной алгоритм инференса
+
+Сигнал с микрофонной решётки разделяется на два параллельных пути: путь локализации (использует все 8 каналов) и путь классификации (использует один канал, выбранный по результату локализации).
+
+```mermaid
+flowchart TD
+    IN["8-канальный WAV<br/>16 кГц, моно по каналу<br/>длительность 10 с<br/>(160 000 отсчётов × 8)"] --> SPLIT(("Разветвление<br/>сигнала"))
+    SPLIT --> LOC["Блок локализации:<br/>GCC-PHAT грубо +<br/>SRP-PHAT уточнённо"]
+    LOC --> DOA["Направление<br/>прихода<br/>doa_deg от 0° до 360°"]
+    SPLIT --> CS["Выбор канала<br/>ближайшего<br/>к doa_deg"]
+    DOA --> CS
+    CS --> SINGLE["Одноканальный сигнал<br/>16 кГц × 10 с"]
+    SINGLE --> FX{"Извлечение<br/>признаков"}
+    FX -->|"для CNN"| MEL["log-Mel-спектрограмма<br/>FP32 [B, T, 128]<br/>n_fft=1024, hop=512"]
+    FX -->|"для AST"| AST_IN["AST input_values<br/>FP32 [B, 1024, 128]"]
+    MEL --> CLF["ONNX-классификатор<br/>(CNN или AST,<br/>выбран в GUI)"]
+    AST_IN --> CLF
+    CLF --> LOGITS["Логиты по классам<br/>FP32 [B, C]"]
+    LOGITS --> SOFT["softmax + argmax"]
+    SOFT --> CLASS["class_name + confidence"]
+    SINGLE -.для сирен EmV.-> DIST["Оценка расстояния<br/>по пиковой амплитуде<br/>A0, R0 из config.pbtxt"]
+    DIST --> OUT
+    CLASS --> OUT[("Итоговый ответ:<br/>doa_deg, selected_mic,<br/>class_name, confidence,<br/>distance_m, is_emv")]
+    DOA --> OUT
+```
+
+## Алгоритм локализации
+
+Локализация выполняется в два шага. Сначала по парам микрофонов оценивается взаимная задержка прихода сигнала через GCC-PHAT (обобщённая взаимная корреляция с фазовым преобразованием), что даёт грубую оценку направления прихода по угловой сетке. Затем в окрестности грубой оценки выполняется SRP-PHAT (steered response power с фазовым преобразованием), который уточняет угол по максимуму выходной мощности сфокусированной решётки.
+
+```mermaid
+flowchart LR
+    IN8["8-канальный сигнал<br/>с круговой решётки<br/>16 кГц"] --> XCORR["GCC-PHAT<br/>попарная взаимная корреляция<br/>с фазовым преобразованием"]
+    XCORR --> TDOA["Оценки взаимных<br/>задержек по парам<br/>микрофонов"]
+    TDOA --> COARSE["Грубая оценка<br/>направления прихода<br/>по угловой сетке"]
+    IN8 --> SRP["SRP-PHAT<br/>сканирование угла<br/>в окрестности грубой оценки"]
+    COARSE --> SRP
+    SRP --> POW["Зависимость выходной<br/>мощности решётки<br/>от направления сканирования"]
+    POW --> ARGMAX["Выбор угла по<br/>максимуму мощности"]
+    ARGMAX --> FINE["Уточнённое направление<br/>прихода (градусы)"]
+```
+
+Геометрия решётки — круговая, 8 микрофонов по азимутам `i · 45°`, диаметр 1 м (см. раздел «Соглашение об индексации микрофонов» ниже).
+
 ## Классы (17)
 
 car_acceleration · car_braking · car_horn · car_idling · moto_acceleration · moto_idling · siren_1 · siren_4 · siren_5 · tram · tram_acceleration · tram_braking · tram_ring · truck_acceleration · truck_braking · truck_horn · truck_idling
@@ -101,3 +171,4 @@ python scripts/export_dummy_classifier.py             # опциональная
 python scripts/generate_demo_asset.py --doa 75        # сборка синтетического 8-канального WAV
 docker compose up --build                             # полный стек
 ```
+
